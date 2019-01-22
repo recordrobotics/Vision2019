@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import time
+from networktables import NetworkTables as nt
 
 # PARAMS
 params = cv2.SimpleBlobDetector_Params()
@@ -22,11 +23,6 @@ LBOUND = np.array([45, 0, 250])
 UBOUND = np.array([75, 100, 255])
 # END PARAMS
 
-
-print("OpenCV version: " + cv2.__version__)
-
-cap = cv2.VideoCapture(0)
-
 def find_tapes(points):
     min_i = 0
     min_j = 1
@@ -43,6 +39,14 @@ def find_tapes(points):
                 min_score = score
 
     return min_i, min_j
+
+
+print("OpenCV version: " + cv2.__version__)
+
+cap = cv2.VideoCapture(0)
+
+nt.initialize(server="roborio-6731-frc.local")
+sd = nt.getTable("SmartDashboard")
 
 while 1:
     ### MAIN LOOP
@@ -70,6 +74,8 @@ while 1:
                                      cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
             cv2.imshow("yay", display)
         
+            sd.putNumber("tape", 0.5 * (points[min_i].pt[0] + points[min_j].pt[0]))
+
         cv2.imshow("masked", blurred)
     
     if cv2.waitKey(1) & 0xFF == ord('q'):
