@@ -3,11 +3,14 @@ import numpy as np
 import time
 from networktables import NetworkTables as nt
 
+
+frameScalingFactor = 0.3
+
 # PARAMS
 params = cv2.SimpleBlobDetector_Params()
 params.filterByArea = True
-params.minArea = 300
-params.maxArea = 6000
+params.minArea = 60#*frameScalingFactor*frameScalingFactor
+params.maxArea = 6000#*frameScalingFactor*frameScalingFactor
 params.filterByCircularity = False
 params.filterByColor = False
 params.blobColor = 255
@@ -24,9 +27,9 @@ UBOUND = np.array([75, 100, 255])
 # END PARAMS
 
 def find_tapes(points):
-    min_i = 0
-    min_j = 1
-    min_score = 100000000.0
+    min_i = -1
+    min_j = -1
+    min_score = 0.1
     for i in range(len(points)):
         for j in range(i + 1, len(points)):
             s = points[i].size + points[j].size
@@ -39,12 +42,16 @@ def find_tapes(points):
                 min_j = j
                 min_score = score
 
+#    print("Score: " + str(min_score))
     return min_i, min_j
 
 
 print("OpenCV version: " + cv2.__version__)
 
+
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1440 * frameScalingFactor)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960 * frameScalingFactor)
 
 nt.initialize(server="roborio-6731-frc.local")
 sd = nt.getTable("SmartDashboard")
@@ -67,18 +74,20 @@ while 1:
 
         ### END MAIN LOOP
 
-        # print("FPS: " + str(1.0 / (end - start)))
-
+#        print("FPS: " + str(1.0 / (end - start)))
+	
+        x = -1.0
         if len(points) > 1:
             min_i, min_j = find_tapes(points)
-            display = cv2.drawKeypoints(bgr, [ points[min_i], points[min_j] ], np.array([]), (0, 0, 255),
-                                     cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-            sd.putNumber("tape", 0.5 * (points[min_i].pt[0] + points[min_j].pt[0]))
-        
-            cv2.imshow("yay", display)
-    
+            if min_i >= 0:
+#                display = cv2.drawKeypoints(bgr, [ points[min_i], points[min_j] ], np.array([]), (0, 0, 255),
+#                                         cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+                x = 0.5 * (points[min_i].pt[0] + points[min_j].pt[0])
+                x = (x - 720 * frameScalingFactor) / (720 * frameScalingFactor)
+#                cv2.imshow("yay", display)
+        print(x)    
 
-        cv2.imshow("masked", blurred)
+#        cv2.imshow("masked", blurred)
    
     c = cv2.waitKey(1) & 0xFF
     if c == ord('r'):
@@ -107,7 +116,7 @@ while 1:
         UBOUND[2] -= 1
     elif c == ord('q'):
         break
-    print(str(LBOUND) +' '+ str(UBOUND))
+#    print(str(LBOUND) +' '+ str(UBOUND))
 
 cap.release()
 cv2.destroyAllWindows()
