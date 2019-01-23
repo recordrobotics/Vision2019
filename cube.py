@@ -33,7 +33,8 @@ def find_tapes(points):
             score = abs(points[i].pt[1] - points[j].pt[1]) / s + \
                     abs(points[i].size - points[j].size) / s
 
-            if points[i].pt[1] > 220 and points[j].pt[1] > 220 and score < min_score:
+            m = 0
+            if points[i].pt[1] > m and points[j].pt[1] > m and score < min_score:
                 min_i = i
                 min_j = j
                 min_score = score
@@ -66,20 +67,47 @@ while 1:
 
         ### END MAIN LOOP
 
-        print("FPS: " + str(1.0 / (end - start)))
+        # print("FPS: " + str(1.0 / (end - start)))
 
         if len(points) > 1:
             min_i, min_j = find_tapes(points)
             display = cv2.drawKeypoints(bgr, [ points[min_i], points[min_j] ], np.array([]), (0, 0, 255),
                                      cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-            cv2.imshow("yay", display)
-        
             sd.putNumber("tape", 0.5 * (points[min_i].pt[0] + points[min_j].pt[0]))
+        
+            cv2.imshow("yay", display)
+    
 
         cv2.imshow("masked", blurred)
-    
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+   
+    c = cv2.waitKey(1) & 0xFF
+    if c == ord('r'):
+        LBOUND[0] += 1
+    elif c == ord('f'):
+        LBOUND[0] -= 1
+    elif c == ord('t'):
+        LBOUND[1] += 1
+    elif c == ord('g'):
+        LBOUND[1] -= 1
+    elif c == ord('y'):
+        LBOUND[2] += 1
+    elif c == ord('h'):
+        LBOUND[2] -= 1
+    if c == ord('u'):
+        UBOUND[0] += 1
+    elif c == ord('j'):
+        UBOUND[0] -= 1
+    elif c == ord('i'):
+        UBOUND[1] += 1
+    elif c == ord('k'):
+        UBOUND[1] -= 1
+    elif c == ord('o'):
+        UBOUND[2] += 1
+    elif c == ord('l'):
+        UBOUND[2] -= 1
+    elif c == ord('q'):
         break
+    print(str(LBOUND) +' '+ str(UBOUND))
 
 cap.release()
 cv2.destroyAllWindows()
