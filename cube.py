@@ -48,8 +48,16 @@ def find_tapes(points):
 
 print("OpenCV version: " + cv2.__version__)
 
+def kernel(bgr, lbound, ubound, detect, blur_size = (5, 5)):
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)  
+    mask = cv2.inRange(hsv, lbound, ubound)
+    blurred = cv2.blur(mask, blur_size)
+    
+    points = detect.detect(blurred)
 
-cap = cv2.VideoCapture(0)
+    return points
+
+cap = cv2.VideoCapture(1)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1440 * frameScalingFactor)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960 * frameScalingFactor)
 
@@ -64,11 +72,10 @@ while 1:
     if r:
         start = time.time()
 
-        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)  
-        mask = cv2.inRange(hsv, LBOUND, UBOUND)
-        blurred = cv2.blur(mask, (5, 5))
-        
-        points = detector.detect(blurred)
+        if looking == "tape":
+            kernel(bgr, tape_lbound, tape_ubound, tape_detector)
+        else:
+            kernel(bgr, ball_lbound, ball_ubound, ball_detector)
 
         end = time.time()
 
@@ -80,14 +87,14 @@ while 1:
         if len(points) > 1:
             min_i, min_j = find_tapes(points)
             if min_i >= 0:
-#                display = cv2.drawKeypoints(bgr, [ points[min_i], points[min_j] ], np.array([]), (0, 0, 255),
-#                                         cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+                display = cv2.drawKeypoints(bgr, [ points[min_i], points[min_j] ], np.array([]), (0, 0, 255),
+                                         cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
                 x = 0.5 * (points[min_i].pt[0] + points[min_j].pt[0])
-                x = (x - 720 * frameScalingFactor) / (720 * frameScalingFactor)
-#                cv2.imshow("yay", display)
+                #x = (x - 720 * frameScalingFactor) / (720 * frameScalingFactor)
+                cv2.imshow("yay", display)
         print(x)    
 
-#        cv2.imshow("masked", blurred)
+        cv2.imshow("masked", blurred)
    
     c = cv2.waitKey(1) & 0xFF
     if c == ord('r'):
