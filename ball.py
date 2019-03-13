@@ -7,40 +7,34 @@ from networktables import NetworkTables as nt
 frameScalingFactor = 0.3
 
 # PARAMS
-params = cv2.SimpleBlobDetector_Params()
-params.filterByArea = True
-params.minArea = 60#*frameScalingFactor*frameScalingFactor
-params.maxArea = 6000#*frameScalingFactor*frameScalingFactor
-params.filterByCircularity = False
-params.filterByColor = False
-params.blobColor = 255
-params.filterByConvexity = True
-params.minConvexity = 0.3
-params.maxConvexity = 1.0
-params.filterByInertia = True
-params.minInertiaRatio = 0.04
-params.maxInertiaRatio = 0.5
-detector = cv2.SimpleBlobDetector_create(params)
+LBOUND_ORANGE = np.array([0, 100, 200])
+UBOUND_ORANGE = np.array([50, 255, 255])
 
-LBOUND = np.array([45, 0, 250])
-UBOUND = np.array([75, 100, 255])
+LBOUND_BRIGHT = np.array([0, 0, 250])
+UBOUND_BRIGHT = np.array([60, 100, 255])
+
+LBOUND_WHITE_BGR = np.array([254, 254, 254])
+UBOUND_WHITE_BGR = np.array([255, 255, 255])
 # END PARAMS
 
 print("OpenCV version: " + cv2.__version__)
 
 def kernel(bgr):
-    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)  
-    mask = cv2.inRange(hsv, LBOUND, UBOUND)
-    blurred = cv2.blur(mask, (5, 5))
-    cv2.imshow("masked", blurred)
-    
-    points = detector.detect(blurred)
+    bgr = cv2.blur(bgr, (7, 7))
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
 
-    return points
+    mask_white = cv2.inRange(bgr, LBOUND_WHITE_BGR,UBOUND_WHITE_BGR)
+    mask_bright = cv2.inRange(hsv, LBOUND_BRIGHT, UBOUND_BRIGHT)
+    mask_orange = cv2.inRange(hsv, LBOUND_ORANGE, UBOUND_ORANGE)
+    mask = cv2.bitwise_or(mask_orange, mask_bright)
+    mask = cv2.bitwise_and(cv2.bitwise_not(mask_white),mask)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, (31, 31), iterations=2)
+
+    return mask
 
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1440 * frameScalingFactor)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960 * frameScalingFactor)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, cap.get(cv2.CAP_PROP_FRAME_WIDTH) * frameScalingFactor)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  * frameScalingFactor)
 
 nt.initialize(server="roborio-6731-frc.local")
 sd = nt.getTable("SmartDashboard")
@@ -49,64 +43,56 @@ while 1:
     ### MAIN LOOP
 
     r, bgr = cap.read()
+    h = bgr.shape[0]
+    hw = bgr.shape[1] * 0.5
     
     if r:
         start = time.time()
 
-        points = kernel(bgr)
+        mask = kernel(bgr)
 
         end = time.time()
 
         ### END MAIN LOOP
 
-#        print("FPS: " + str(1.0 / (end - start)))
-	
-        x = -1.5
-        y = -1.5
-        if len(points) > 1:
-            display = cv2.drawKeypoints(bgr, points, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-            cv2.imshow("yay", display)
-            x = 0.0
-            y = 0.0
-            for p in points:
-                x += 0.5 * (p.pt[0] + p.pt[0])
-                y += 0.5 * (p.pt[1] + p.pt[1])
-            x /= len(points)
-            y /= len(points)
+        cv2.imshow("masked", mask)
 
-        print("x: " + str(x) + "  y: " + str(y))
-        sd.putNumber("ball_x|PI_2", x)
-        sd.putNumber("ball_y|PI_2", y)
+        try:
+            M = cv2.moments(mask)
+            x = (M["m10"] / M["m00"] - hw) / hw
+            y = (M["m01"] / M["m00"]) / h
+        
+            print("x: " + str(x) + "  y: " + str(y))
+            sd.putNumber("ball_x|PI_2", x)
+            sd.putNumber("ball_y|PI_2", y)
+        except:
+            sd.putNumber("ball_x|PI_2", -2)
+            sd.putNumber("ball_y|PI_2", -2)
+
 
    
+    bound1 = LBOUND_ORANGE
+    bound2 = UBOUND_ORANGE
+
     c = cv2.waitKey(1) & 0xFF
-    if c == ord('r'):
-        LBOUND[0] += 1
-    elif c == ord('f'):
-        LBOUND[0] -= 1
-    elif c == ord('t'):
-        LBOUND[1] += 1
-    elif c == ord('g'):
-        LBOUND[1] -= 1
-    elif c == ord('y'):
-        LBOUND[2] += 1
-    elif c == ord('h'):
-        LBOUND[2] -= 1
-    if c == ord('u'):
-        UBOUND[0] += 1
-    elif c == ord('j'):
-        UBOUND[0] -= 1
-    elif c == ord('i'):
-        UBOUND[1] += 1
-    elif c == ord('k'):
-        UBOUND[1] -= 1
-    elif c == ord('o'):
-        UBOUND[2] += 1
-    elif c == ord('l'):
-        UBOUND[2] -= 1
-    elif c == ord('q'):
+
+    keys1 = [ord(ki) for ki in "rftgyh"]
+    keys2 = [ord(ki) for ki in "ujikol"]
+    for k1 in range(len(keys1)):
+        if c == keys1[k1]:
+            dirrection = 1 if (k1 % 2)==0 else -1
+            which = k1 // 2
+            bound1[which] += dirrection
+    for k2 in range(len(keys2)):
+        if c == keys2[k2]:
+            dirrection = 1 if (k2 % 2)==0 else -1
+            which = k2 // 2
+            bound2[which] += dirrection
+
+    if c == ord('q'):
         break
-#    print(str(LBOUND) +' '+ str(UBOUND))
+
+    print(str(bound1) +' '+ str(bound2))
 
 cap.release()
 cv2.destroyAllWindows()

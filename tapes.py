@@ -49,15 +49,17 @@ def find_tapes(points):
 print("OpenCV version: " + cv2.__version__)
 
 def kernel(bgr, lbound, ubound, detect, blur_size = (5, 5)):
-    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)  
+    blurred = cv2.blur(bgr, blur_size)
+    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)  
     mask = cv2.inRange(hsv, lbound, ubound)
-    blurred = cv2.blur(mask, blur_size)
     
-    points = detect.detect(blurred)
+    cv2.imshow("masked", mask)
+    
+    points = detect.detect(mask)
 
     return points
 
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1440 * frameScalingFactor)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960 * frameScalingFactor)
 
@@ -72,10 +74,7 @@ while 1:
     if r:
         start = time.time()
 
-        if looking == "tape":
-            kernel(bgr, tape_lbound, tape_ubound, tape_detector)
-        else:
-            kernel(bgr, ball_lbound, ball_ubound, ball_detector)
+        points = kernel(bgr, LBOUND, UBOUND, detector, (11, 11))
 
         end = time.time()
 
@@ -94,7 +93,6 @@ while 1:
                 cv2.imshow("yay", display)
         print(x)    
 
-        cv2.imshow("masked", blurred)
    
     c = cv2.waitKey(1) & 0xFF
     if c == ord('r'):
