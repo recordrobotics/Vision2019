@@ -12,7 +12,7 @@ import time
 from networktables import NetworkTables as nt
 
 
-frameScalingFactor = 0.8
+frameScalingFactor = 0.3
 
 # PARAMS
 params = cv2.SimpleBlobDetector_Params()
@@ -37,11 +37,11 @@ UBOUND = np.array([75, 10, 255])
 # THIS IS ALEKS NEW FIND TAPE THING
 # IT FINDS MULTIPLE TAPES
 # THERE IS A FAIRLY GOOD CHANCE THAT MANY ARE NOT LEGIT i.e. (100,-1,-1)
-LOWEST_ACCEPTABLE_SCORE = 1.0
+HIGHEST_ACCEPTABLE_SCORE = 1.0
 def find_tapes(points):
     H = 15 # 15 is 6 choose 2, it is the maxmimum number of pair that we are willing to output
     # goodPoints[i] = (pair's score, pair's left most index, pair's right most index)
-    goodPoints = [(LOWEST_ACCEPTABLE_SCORE,-1,-1) for i in range(15)]
+    goodPoints = [(HIGHEST_ACCEPTABLE_SCORE,-1,-1) for i in range(15)]
     for i in range(len(points)):
         for j in range(i + 1, len(points)):
             s = points[i].size + points[j].size
@@ -75,7 +75,7 @@ def kernel(bgr, lbound, ubound, detect, blur_size = (5, 5)):
     hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lbound, ubound)
 
-    cv2.imshow("masked", mask)
+    #cv2.imshow("masked", mask)
 
     points = detect.detect(mask)
 
@@ -95,23 +95,29 @@ while 1:
     r, bgr = cap.read()
 
     if r:
-        start = time.time()
+        gstart = time.time()
 
         points, mask = kernel(bgr, LBOUND, UBOUND, detector, (3, 3))
 
-        end = time.time()
 
         ### END MAIN LOOP
         # print("FPS: " + str(1.0 / (end - start)))
 
         x = -1.0
         if len(points) > 1:
+            start = time.time()
             goodPoints = find_tapes(points) # NOTE: this is sorted by score and only includes points which were accepted by the score function
+            end = time.time()
+
+           # print("Find tapes time: " + str(end - start))
+            
+            start = time.time()
 
             if len(goodPoints) > 0:
                 best_score = goodPoints[0][0]
+                m = points[goodPoints[0][1]].pt[1]
                 for i in range(1, len(goodPoints)):
-                    if goodPoints[i][0] > best_score * 5:
+                    if goodPoints[i][0] > best_score * 5 or abs(points[goodPoints[i][1]].pt[1] - m) > 0.2 * mask.shape[0]:
                         goodPoints = goodPoints[:i]
                         break
                 
@@ -119,7 +125,7 @@ while 1:
                 # sort by distance
                 goodPoints.sort(key = lambda curTuple: abs(points[curTuple[2]].pt[0] - points[curTuple[1]].pt[0])) # tbh dont really need abs, it is certainly positive
                 
-                print(goodPoints)
+                #print(goodPoints)
 
                 # will store real canidates who did well on distance and have the correct orientation
                 top3 = []
@@ -130,14 +136,16 @@ while 1:
                     # compute the orientation of the strip (very expensive(?(numpy is kinda pro so maybe not...)))
                     f = 0.7
 
-                    topleft1 = (int(points[goodPoints[i][1]].pt[1] - points[goodPoints[i][1]].size * f), int(points[goodPoints[i][1]].pt[0] - points[goodPoints[i][1]].size * f))
-                    bottomright1 = (int(points[goodPoints[i][1]].pt[1] + points[goodPoints[i][1]].size * f), int(points[goodPoints[i][1]].pt[0] + points[goodPoints[i][1]].size * f))
+                    topleft1 = (max(0, int(points[goodPoints[i][1]].pt[1] - points[goodPoints[i][1]].size * f)), max(0, int(points[goodPoints[i][1]].pt[0] - points[goodPoints[i][1]].size * f)))
+                    bottomright1 = (max(0, int(points[goodPoints[i][1]].pt[1] + points[goodPoints[i][1]].size * f)), max(0, int(points[goodPoints[i][1]].pt[0] + points[goodPoints[i][1]].size * f)))
 
-                    topleft2 = (int(points[goodPoints[i][2]].pt[1] - points[goodPoints[i][2]].size * f), int(points[goodPoints[i][2]].pt[0] - points[goodPoints[i][2]].size * f))
-                    bottomright2 = (int(points[goodPoints[i][2]].pt[1] + points[goodPoints[i][2]].size * f), int(points[goodPoints[i][2]].pt[0] + points[goodPoints[i][2]].size * f))
-
+                    topleft2 = (max(0, int(points[goodPoints[i][2]].pt[1] - points[goodPoints[i][2]].size * f)), max(0, int(points[goodPoints[i][2]].pt[0] - points[goodPoints[i][2]].size * f)))
+                    bottomright2 = (max(0, int(points[goodPoints[i][2]].pt[1] + points[goodPoints[i][2]].size * f)), max(0, int(points[goodPoints[i][2]].pt[0] + points[goodPoints[i][2]].size * f)))
+                    
                     rect1 = mask[topleft1[0]:bottomright1[0],topleft1[1]:bottomright1[1]]
                     rect2 = mask[topleft2[0]:bottomright2[0],topleft2[1]:bottomright2[1]]
+
+          #          cv2.imshow("rect1", rect1)
 
                     indx1 = np.where(rect1 != 0)
                     indx2 = np.where(rect2 != 0)
@@ -173,7 +181,6 @@ while 1:
                 # but, I want to check to make sure that it is not bad (adversary: /__\,/\__,__/\)
 
                 dists = [abs(points[centerScores[i][1][2]].pt[0]-points[centerScores[i][1][1]].pt[0]) for i in range(len(top3))]
-                print(centerScores)
                 if len(dists) > 1 and dists[0] > dists[1]*1.5:
                     # OK this is a bit eXTREME
                     seekPoint = centerScores[1][1]
@@ -192,10 +199,18 @@ while 1:
                     goal_j = seekPoint[2]
                     # GO TO THIS POINT!!!!!
 
-                    cv2.circle(bgr, (int(points[goal_i].pt[0]), int(points[goal_i].pt[1])), 10, (0,0,0), 5)
-                    cv2.circle(bgr, (int(points[goal_j].pt[0]), int(points[goal_j].pt[1])), 10, (0,0,0), 5)
-                else:
-                    print("Nothing found")
+                    cv2.circle(bgr, (int(points[goal_i].pt[0]), int(points[goal_i].pt[1])), 20, (0,0,255), 3)
+                    cv2.circle(bgr, (int(points[goal_j].pt[0]), int(points[goal_j].pt[1])), 20, (0,0,255), 3)
+
+         #           cv2.imshow("Result", bgr)
+         #       else:
+         #           cv2.imshow("Result", bgr)
+            
+            end = time.time()
+            #print("Find tapes 2 time: " + str(end - start))
+        
+        gend = time.time()
+        print("Frame time: " + str(gend - gstart))
 
     c = cv2.waitKey(1) & 0xFF
 
@@ -213,7 +228,7 @@ while 1:
             UBOUND[which] += dirrection
     if c == ord('q'):
         break
-    print(str(LBOUND) +' '+ str(UBOUND))
+    #print(str(LBOUND) +' '+ str(UBOUND))
 
 cap.release()
 cv2.destroyAllWindows()
