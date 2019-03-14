@@ -82,7 +82,7 @@ def kernel(bgr, lbound, ubound, detect, blur_size = (5, 5)):
     return points, mask
 
 # WRONG CAMERA BAD BAD BAD BAD BAD BAD
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1440 * frameScalingFactor)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960 * frameScalingFactor)
 
@@ -146,7 +146,7 @@ while 1:
                     rect1 = mask[topleft1[0]:bottomright1[0],topleft1[1]:bottomright1[1]]
                     rect2 = mask[topleft2[0]:bottomright2[0],topleft2[1]:bottomright2[1]]
 
-          #          cv2.imshow("rect1", rect1)
+                    cv2.imshow("rect1", rect1)
 
                     indx1 = np.where(rect1 != 0)
                     indx2 = np.where(rect2 != 0)
@@ -154,6 +154,8 @@ while 1:
                     #print(indx1)
                     slope1 = np.polyfit(indx1[0], indx1[1],1)[0] # get the a in y=ax+b
                     slope2 = np.polyfit(indx2[0], indx2[1],1)[0] # first coeffiecient of the poly
+
+                    print(slope1, slope2)
 
                     if slope1 * slope2 < 0: # if they point in opposite dirrections
                         top3.append(goodPoints[i])
@@ -194,14 +196,16 @@ while 1:
                     seekPoint = -1
 
                 # QUESTION: are there other edge cases??????????????
+                for cp in range(len(centerScores)):
+                    cv2.circle(bgr, int(points[centerScores[cp][1][2]].pt[0]), int(points[centerScores[cp][1][2]].pt[1]), 20, (0,0,255), 3)
 
                 if seekPoint != -1:
                     goal_i = seekPoint[1]
                     goal_j = seekPoint[2]
                     # GO TO THIS POINT!!!!!
 
-                    cv2.circle(bgr, (int(points[goal_i].pt[0]), int(points[goal_i].pt[1])), 20, (0,0,255), 3)
-                    cv2.circle(bgr, (int(points[goal_j].pt[0]), int(points[goal_j].pt[1])), 20, (0,0,255), 3)
+                    #cv2.circle(bgr, (int(points[goal_i].pt[0]), int(points[goal_i].pt[1])), 20, (0,0,255), 3)
+                    #cv2.circle(bgr, (int(points[goal_j].pt[0]), int(points[goal_j].pt[1])), 20, (0,0,255), 3)
 
                     cv2.imshow("Result", bgr)
                 else:
