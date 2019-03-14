@@ -116,6 +116,7 @@ while 1:
             if len(goodPoints) > 0:
                 best_score = goodPoints[0][0]
                 m = points[goodPoints[0][1]].pt[1]
+                print("Best score: " + str(best_score))
                 for i in range(1, len(goodPoints)):
                     if goodPoints[i][0] > best_score * 5 or abs(points[goodPoints[i][1]].pt[1] - m) > 0.2 * mask.shape[0]:
                         goodPoints = goodPoints[:i]
@@ -202,9 +203,9 @@ while 1:
                     cv2.circle(bgr, (int(points[goal_i].pt[0]), int(points[goal_i].pt[1])), 20, (0,0,255), 3)
                     cv2.circle(bgr, (int(points[goal_j].pt[0]), int(points[goal_j].pt[1])), 20, (0,0,255), 3)
 
-         #           cv2.imshow("Result", bgr)
-         #       else:
-         #           cv2.imshow("Result", bgr)
+                    cv2.imshow("Result", bgr)
+                else:
+                    cv2.imshow("Result", bgr)
             
             end = time.time()
             #print("Find tapes 2 time: " + str(end - start))
