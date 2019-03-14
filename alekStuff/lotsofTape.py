@@ -197,7 +197,7 @@ while 1:
 
                 # QUESTION: are there other edge cases??????????????
                 for cp in range(len(centerScores)):
-                    cv2.circle(bgr, int(points[centerScores[cp][1][2]].pt[0]), int(points[centerScores[cp][1][2]].pt[1]), 20, (0,0,255), 3)
+                    cv2.circle(bgr, (int(points[centerScores[cp][1][2]].pt[0]), int(points[centerScores[cp][1][2]].pt[1])), 20, (0,0,255), 3)
 
                 if seekPoint != -1:
                     goal_i = seekPoint[1]
