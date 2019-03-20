@@ -11,7 +11,6 @@ import numpy as np
 import time
 from networktables import NetworkTables as nt
 
-
 frameScalingFactor = 0.3
 
 # PARAMS
@@ -30,9 +29,16 @@ params.minInertiaRatio = 0.04
 params.maxInertiaRatio = 0.5
 detector = cv2.SimpleBlobDetector_create(params)
 
-LBOUND = np.array([0, 0, 0]) #np.array([50, 0, 250])
+LBOUND = np.array([50, 0, 250])
 UBOUND = np.array([75, 10, 255])
 # END PARAMS
+
+gamma = 0.9
+movingAvgSeekPt = np.array([0,0])
+dontLook = 10
+dontLookCt = 0
+
+history = []
 
 # THIS IS ALEKS NEW FIND TAPE THING
 # IT FINDS MULTIPLE TAPES
@@ -74,11 +80,8 @@ def kernel(bgr, lbound, ubound, detect, blur_size = (5, 5)):
     blurred = cv2.blur(bgr, blur_size)
     hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lbound, ubound)
-
-    #cv2.imshow("masked", mask)
-
+    cv2.imshow("masked", mask)
     points = detect.detect(mask)
-
     return points, mask
 
 # WRONG CAMERA BAD BAD BAD BAD BAD BAD
@@ -93,15 +96,16 @@ while 1:
     ### MAIN LOOP
 
     r, bgr = cap.read()
-
+   
     if r:
+        bgr = bgr[int(bgr.shape[0]*0.5):,:]
         gstart = time.time()
-
         points, mask = kernel(bgr, LBOUND, UBOUND, detector, (3, 3))
-
 
         ### END MAIN LOOP
         # print("FPS: " + str(1.0 / (end - start)))
+        for i in range(len(points)):
+             cv2.circle(bgr, (int(points[i].pt[0]), int(points[i].pt[1])), 20, (0,255,0), 3)
 
         x = -1.0
         if len(points) > 1:
@@ -116,7 +120,7 @@ while 1:
             if len(goodPoints) > 0:
                 best_score = goodPoints[0][0]
                 m = points[goodPoints[0][1]].pt[1]
-                print("Best score: " + str(best_score))
+                #print("Best score: " + str(best_score))
                 for i in range(1, len(goodPoints)):
                     if goodPoints[i][0] > best_score * 5 or abs(points[goodPoints[i][1]].pt[1] - m) > 0.2 * mask.shape[0]:
                         goodPoints = goodPoints[:i]
@@ -155,9 +159,9 @@ while 1:
                     slope1 = np.polyfit(indx1[0], indx1[1],1)[0] # get the a in y=ax+b
                     slope2 = np.polyfit(indx2[0], indx2[1],1)[0] # first coeffiecient of the poly
 
-                    print(slope1, slope2)
-
-                    if slope1 * slope2 < 0: # if they point in opposite dirrections
+                    #print(slope1, slope2) 
+                    
+                    if slope1 < 0 and slope2 > 0: # if they point in opposite dirrections
                         top3.append(goodPoints[i])
                         if len(top3) >= 3:
                             break
@@ -196,16 +200,30 @@ while 1:
                     seekPoint = -1
 
                 # QUESTION: are there other edge cases??????????????
+                """
+                blah = 10
                 for cp in range(len(centerScores)):
-                    cv2.circle(bgr, (int(points[centerScores[cp][1][2]].pt[0]), int(points[centerScores[cp][1][2]].pt[1])), 20, (0,0,255), 3)
-
+                    blah += 10
+                    cv2.circle(bgr, (int(points[centerScores[cp][1][2]].pt[0]), int(points[centerScores[cp][1][2]].pt[1])), blah, (0,0,255), 3)
+                """
                 if seekPoint != -1:
                     goal_i = seekPoint[1]
                     goal_j = seekPoint[2]
                     # GO TO THIS POINT!!!!!
 
-                    #cv2.circle(bgr, (int(points[goal_i].pt[0]), int(points[goal_i].pt[1])), 20, (0,0,255), 3)
-                    #cv2.circle(bgr, (int(points[goal_j].pt[0]), int(points[goal_j].pt[1])), 20, (0,0,255), 3)
+                    cv2.circle(bgr, (int(points[goal_i].pt[0]), int(points[goal_i].pt[1])), 20, (0,0,255), 3)
+                    cv2.circle(bgr, (int(points[goal_j].pt[0]), int(points[goal_j].pt[1])), 20, (0,0,255), 3)
+
+                    seekPointCoords = np.array([(points[goal_i].pt[0]+points[goal_j].pt[0])*0.5, (points[goal_i].pt[1]+points[goal_j].pt[1])*0.5])
+                    
+                    movingAvgSeekPt = gamma*movingAvgSeekPt + (1-gamma)*seekPointCoords 
+                    
+                    dontLookCt += 1
+                    if dontLookCt > dontLook:
+                        score = np.linalg.norm(seekPointCoords - movingAvgSeekPt)
+                        if score < 100: # Calibrate this!!!!!!!!!!!!!
+                            history.append(seekPointCoords)
+                            cv2.circle(bgr, (int(seekPointCoords[0]), int(seekPointCoords[1])), 15, (255,0,0), 6)
 
                     cv2.imshow("Result", bgr)
                 else:
@@ -215,7 +233,8 @@ while 1:
             #print("Find tapes 2 time: " + str(end - start))
         
         gend = time.time()
-        print("Frame time: " + str(gend - gstart))
+        #print("Frame time: " + str(gend - gstart))
+        
 
     c = cv2.waitKey(1) & 0xFF
 
@@ -232,8 +251,15 @@ while 1:
             which = k2 // 2
             UBOUND[which] += dirrection
     if c == ord('q'):
+        history = np.array(history) 
+        history = history.tolist()
+        import json
+        with open("test.json", "w") as f:
+            json.dump(history, f)
+        with open("screenSize.json", "w") as f:
+            json.dump(bgr.shape, f)
         break
-    #print(str(LBOUND) +' '+ str(UBOUND))
+    print(str(LBOUND) +' '+ str(UBOUND))
 
 cap.release()
 cv2.destroyAllWindows()
