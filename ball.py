@@ -32,7 +32,7 @@ def kernel(bgr):
 
     return mask
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, cap.get(cv2.CAP_PROP_FRAME_WIDTH) * frameScalingFactor)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  * frameScalingFactor)
 
@@ -92,7 +92,7 @@ while 1:
     if c == ord('q'):
         break
 
-    print(str(bound1) +' '+ str(bound2))
+    #print(str(bound1) +' '+ str(bound2))
 
 cap.release()
 cv2.destroyAllWindows()

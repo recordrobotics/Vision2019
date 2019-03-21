@@ -17,7 +17,7 @@ frameScalingFactor = 0.3
 params = cv2.SimpleBlobDetector_Params()
 params.filterByArea = True
 params.minArea = 60#*frameScalingFactor*frameScalingFactor
-params.maxArea = 60000#*frameScalingFactor*frameScalingFactor
+params.maxArea = 600#*frameScalingFactor*frameScalingFactor
 params.filterByCircularity = False
 params.filterByColor = False
 params.blobColor = 255
@@ -98,7 +98,7 @@ while 1:
     r, bgr = cap.read()
    
     if r:
-        bgr = bgr[int(bgr.shape[0]*0.5):,:]
+        bgr = bgr[int(bgr.shape[0]*0.5):int(bgr.shape[0]*0.8),:]
         gstart = time.time()
         points, mask = kernel(bgr, LBOUND, UBOUND, detector, (3, 3))
 
@@ -221,9 +221,12 @@ while 1:
                     dontLookCt += 1
                     if dontLookCt > dontLook:
                         score = np.linalg.norm(seekPointCoords - movingAvgSeekPt)
-                        if score < 100: # Calibrate this!!!!!!!!!!!!!
+                        if score < 10: # Calibrate this!!!!!!!!!!!!!
                             history.append(seekPointCoords)
                             cv2.circle(bgr, (int(seekPointCoords[0]), int(seekPointCoords[1])), 15, (255,0,0), 6)
+                    #cv2.circle(bgr, (int(seekPointCoords[0]), int(seekPointCoords[1])), 15, (255,0,0), 6)
+                    print(int(seekPointCoords[0]), int(seekPointCoords[1]))
+                    
 
                     cv2.imshow("Result", bgr)
                 else:
@@ -259,7 +262,7 @@ while 1:
         with open("screenSize.json", "w") as f:
             json.dump(bgr.shape, f)
         break
-    print(str(LBOUND) +' '+ str(UBOUND))
+    #print(str(LBOUND) +' '+ str(UBOUND))
 
 cap.release()
 cv2.destroyAllWindows()
