@@ -4,7 +4,7 @@ import time
 from networktables import NetworkTables as nt
 
 
-frameScalingFactor = 0.8
+frameScalingFactor = 0.3
 
 # PARAMS
 params = cv2.SimpleBlobDetector_Params()
@@ -26,29 +26,38 @@ LBOUND = np.array([50, 0, 250])
 UBOUND = np.array([75, 10, 255])
 # END PARAMS
 
+# THIS IS ALEKS NEW FIND TAPE THING
+# IT FINDS MULTIPLE TAPES
+# THERE IS A FAIRLY GOOD CHANCE THAT MANY ARE NOT LEGIT i.e. (100,-1,-1)
+HIGHEST_ACCEPTABLE_SCORE = 1.0
 def find_tapes(points):
-    min_i = -1
-    min_j = -1
-    min_score = 100
+    H = 1 # 15 is 6 choose 2, it is the maxmimum number of pair that we are willing to output
+    # goodPoints[i] = (pair's score, pair's left most index, pair's right most index)
+    goodPoints = [(HIGHEST_ACCEPTABLE_SCORE,-1,-1) for i in range(15)]
     for i in range(len(points)):
         for j in range(i + 1, len(points)):
             s = points[i].size + points[j].size
-            score = abs(points[i].pt[1] - points[j].pt[1]) / s + \
-                    abs(points[i].size - points[j].size) / s
+            score = abs(points[i].pt[1] - points[j].pt[1]) / s + abs(points[i].size - points[j].size) / s
 
             m = 0
-            if points[i].pt[1] > m and points[j].pt[1] > m and score < min_score:
-                min_i = i
-                min_j = j
-                min_score = score
+            #print(score)
+            if points[i].pt[1] > m and points[j].pt[1] > m and score < goodPoints[-1][0]:
+                for k in range(H):  # NOTE: ALEK: change this to be like insertion sort so that it can be cythonated, atm it is kinda trash and sketch and only would work in python
+                    if score < goodPoints[k][0]:
+                        # flip if i is not the left most one
+                        if points[i].pt[0] > points[j].pt[0]:
+                            goodPoints.insert(k, (score, j, i))
+                        else:
+                            goodPoints.insert(k, (score, i, j))
+                        goodPoints.pop()
+                        break
+    for i in range(H):
+        if goodPoints[-1][2] < 0: # not real
+            goodPoints.pop()
+        else:
+            break
 
-#    print("Score: " + str(min_score))
-    if min_i != -1 and points[min_i].pt[0] > points[min_j].pt[0]:
-        t = min_i
-        min_i = min_j
-        min_j = t
-
-    return min_i, min_j
+    return goodPoints
 
 
 print("OpenCV version: " + cv2.__version__)
@@ -89,8 +98,11 @@ while 1:
 	
         x = -1.0
         if len(points) > 1:
-            min_i, min_j = find_tapes(points)
-            if min_i >= 0:
+            goodPoints = find_tapes(points)
+            for t in goodPoints:
+                min_i = t[1]
+                min_j = t[2]
+                
                 f = 0.7
                 topleft1 = (int(points[min_i].pt[1] - points[min_i].size * f), int(points[min_i].pt[0] - points[min_i].size * f))
                 bottomright1 = (int(points[min_i].pt[1] + points[min_i].size * f), int(points[min_i].pt[0] + points[min_i].size * f))
@@ -104,18 +116,22 @@ while 1:
                 indx1 = np.where(rect1 != 0)
                 indx2 = np.where(rect2 != 0)
 
-                line1 = np.polyfit(indx1[:,0], indx1[:,1],1)[1]
-                line2 = np.polyfit(indx2[:,0], indx2[:,1],1)[1]
-                
-                cv2.imshow("rect1", rect1)
-                cv2.imshow("rect2", rect2)
-
-                print(points[min_i].size, points[min_j].size)
-                display = cv2.drawKeypoints(bgr, [ points[min_i], points[min_j] ], np.array([]), (0, 0, 255),
-                                         cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-                x = 0.5 * (points[min_i].pt[0] + points[min_j].pt[0])
-                #x = (x - 720 * frameScalingFactor) / (720 * frameScalingFactor)
-                cv2.imshow("yay", display)
+                try:
+                    slope1 = np.polyfit(indx1[0], indx1[1],1)[1]
+                    slope2 = np.polyfit(indx2[0], indx2[1],1)[1]
+                    
+                    cv2.imshow("rect1", rect1)
+                    cv2.imshow("rect2", rect2)
+                        
+                    if slope1 < 0 and slope2 > 0: # if they point in opposite dirrections
+                        display = cv2.drawKeypoints(bgr, [ points[min_i], points[min_j] ], np.array([]), (0, 0, 255),
+                                             cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+                        x = 0.5 * (points[min_i].pt[0] + points[min_j].pt[0])
+                        #x = (x - 720 * frameScalingFactor) / (720 * frameScalingFactor)
+                        cv2.imshow("yay", display)
+                        break
+                except:
+                    continue
         #print(x)    
 
    
